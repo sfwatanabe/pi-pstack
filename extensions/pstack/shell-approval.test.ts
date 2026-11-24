@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isApprovalMode, shellApproval } from "./shell-approval.ts";
+import { APPROVAL_MODE_ENTRY, isApprovalMode, sessionApprovalMode, shellApproval, type ApprovalMode } from "./shell-approval.ts";
 
 const featurePush = "git push --no-follow-tags origin HEAD:refs/heads/pi/topic";
 
@@ -36,6 +36,27 @@ test("feature-only keeps its push exemption and direct-main block", () => {
   assert.deepEqual(shellApproval(featurePush, "feature-only"), { kind: "allow" });
   assert.deepEqual(shellApproval("git push origin HEAD:main", "feature-only"), { kind: "block-main" });
   assert.deepEqual(shellApproval("git push origin HEAD:main", "feature-only", "auto"), { kind: "block-main" });
+});
+
+test("resuming honors the last setting, but a fork before revocation requires a fresh opt-in", () => {
+  const command = "rm -rf generated/";
+  const entry = (id: string, parentId: string | null, data: unknown) => ({
+    type: "custom" as const,
+    customType: APPROVAL_MODE_ENTRY,
+    id,
+    parentId,
+    timestamp: "2026-01-01T00:00:00.000Z",
+    data,
+  });
+  const optIn = (sessionId: string, mode: ApprovalMode) => ({ sessionId, mode });
+  const auto = entry("1", null, optIn("original", "auto"));
+  const confirm = entry("2", "1", optIn("original", "confirm"));
+  const forkAuto = entry("3", "1", optIn("fork", "auto"));
+  assert.equal(sessionApprovalMode([auto], "original"), "auto");
+  assert.equal(sessionApprovalMode([auto, confirm], "original"), "confirm");
+  assert.equal(shellApproval(command, "confirm", sessionApprovalMode([auto], "fork")).kind, "confirm");
+  assert.equal(shellApproval(command, "confirm", sessionApprovalMode([auto, forkAuto], "fork")).kind, "allow");
+  assert.equal(sessionApprovalMode([entry("4", null, "auto")], "original"), "confirm");
 });
 
 test("only explicit supported modes are accepted", () => {

@@ -64,7 +64,7 @@ By default, pi-pstack prompts before recognizable shell commands that push, edit
 - `/pstack-approval confirm` restores the default.
 - `/pstack-approval status` shows the current mode.
 
-The mode is saved in the current Pi session and survives resume. New sessions default to `confirm`. Auto mode doesn't change other extensions' prompts, project-agent prompts, or explicit approvals required by your project's workflow.
+The mode is saved in the current Pi session and survives resume. New sessions, including forks, default to `confirm`. Auto mode doesn't change other extensions' prompts, project-agent prompts, or explicit approvals required by your project's workflow.
 
 For a narrower exception, `/pstack-push feature-only` skips confirmation for standalone pushes like `git push --no-follow-tags origin HEAD:refs/heads/my-feature`. Force pushes, deletions, and ambiguous or combined push commands still prompt in `confirm` approval mode. The `feature-only` policy blocks recognizable standalone pushes to `main` even in `auto` mode. Never push directly to `main`. Use `/pstack-push status` to inspect the push policy and `/pstack-push confirm` to restore the default push policy.
 

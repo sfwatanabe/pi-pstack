@@ -11,7 +11,7 @@ import { Type } from "typebox";
 import { bundledAgentsDirectory, discoverAgents, projectAgentsDirectory, type AgentConfig, type AgentScope } from "./agents.ts";
 import { ROLE_NAMES, configPath, defaultConfig, modelsForRole, readConfig, writeConfig } from "./config.ts";
 import { isPushPolicy, type PushPolicy } from "./push-policy.ts";
-import { isApprovalMode, shellApproval, type ApprovalMode } from "./shell-approval.ts";
+import { APPROVAL_MODE_ENTRY, isApprovalMode, sessionApprovalMode, shellApproval } from "./shell-approval.ts";
 
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
@@ -233,14 +233,6 @@ async function runLimited<T>(items: T[], callback: (item: T, index: number) => P
 }
 
 const PUSH_POLICY_ENTRY = "pstack-push-policy";
-const APPROVAL_MODE_ENTRY = "pstack-approval-mode";
-
-function sessionApprovalMode(entries: ReturnType<SessionManager["getEntries"]>): ApprovalMode {
-  for (const entry of entries.slice().reverse()) {
-    if (entry.type === "custom" && entry.customType === APPROVAL_MODE_ENTRY && isApprovalMode(entry.data)) return entry.data;
-  }
-  return "confirm";
-}
 
 function sessionPushPolicy(entries: ReturnType<SessionManager["getEntries"]>): PushPolicy {
   for (const entry of entries.slice().reverse()) {
@@ -287,8 +279,9 @@ export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
     if (!isToolCallEventType("bash", event)) return;
     const { command } = event.input;
-    const entries = ctx.sessionManager.getEntries();
-    const decision = shellApproval(command, sessionPushPolicy(entries), sessionApprovalMode(entries));
+    const { sessionManager } = ctx;
+    const entries = sessionManager.getEntries();
+    const decision = shellApproval(command, sessionPushPolicy(entries), sessionApprovalMode(entries, sessionManager.getSessionId()));
     if (decision.kind === "allow") return;
     if (decision.kind === "block-main") return { block: true, reason: "Direct push to main blocked. Push a feature branch and open a PR." };
 
@@ -302,10 +295,11 @@ export default function (pi: ExtensionAPI) {
     description: "Set session shell approval mode: /pstack-approval confirm | auto | status",
     handler: (args, ctx) => {
       const option = args.trim();
+      const sessionId = ctx.sessionManager.getSessionId();
       if (option === "status" || option === "") {
-        ctx.ui.notify(`Pstack shell approval: ${sessionApprovalMode(ctx.sessionManager.getEntries())}`, "info");
+        ctx.ui.notify(`Pstack shell approval: ${sessionApprovalMode(ctx.sessionManager.getEntries(), sessionId)}`, "info");
       } else if (isApprovalMode(option)) {
-        pi.appendEntry(APPROVAL_MODE_ENTRY, option);
+        pi.appendEntry(APPROVAL_MODE_ENTRY, { sessionId, mode: option });
         if (option === "auto") {
           ctx.ui.notify("Pstack will skip shell confirmation prompts for this session, including after resume.", "warning");
         } else {

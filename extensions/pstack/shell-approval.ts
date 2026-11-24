@@ -1,9 +1,24 @@
+import type { SessionManager } from "@earendil-works/pi-coding-agent";
 import { pushDecision, type PushPolicy } from "./push-policy.ts";
+
+export const APPROVAL_MODE_ENTRY = "pstack-approval-mode";
 
 export type ApprovalMode = "confirm" | "auto";
 
 export function isApprovalMode(value: unknown): value is ApprovalMode {
   return value === "confirm" || value === "auto";
+}
+
+export function sessionApprovalMode(entries: readonly ReturnType<SessionManager["getEntries"]>[number][], sessionId: string): ApprovalMode {
+  for (let index = entries.length - 1; index >= 0; index--) {
+    const entry = entries[index];
+    if (entry?.type !== "custom" || entry.customType !== APPROVAL_MODE_ENTRY) continue;
+    const data: unknown = entry.data;
+    // Pi copies custom entries into forks. Only this session's opt-ins count.
+    if (typeof data === "object" && data !== null && "sessionId" in data && data.sessionId === sessionId &&
+        "mode" in data && isApprovalMode(data.mode)) return data.mode;
+  }
+  return "confirm";
 }
 
 type ShellApproval =
