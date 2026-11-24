@@ -56,11 +56,17 @@ This port deliberately removes Cursor-only setup and behavior:
 | `/loop`, cloud-agent resume | explicit project watchers; child Pi processes are local and fresh |
 | Cursor Team Kit skills | capability detection and project-native verification tooling |
 
-Opening a PR from an already-pushed feature branch does not require confirmation. The extension still requests confirmation for recognizable shell commands that push, edit or close PRs, merge, deploy, mutate infrastructure, or recursively delete files. In non-interactive mode it blocks those commands. This is a guardrail, not a complete shell-security sandbox. Prompts require explicit approval for other external or irreversible actions, with this session-level push exception:
+### Shell approvals
 
-- `/pstack-push confirm` restores the default: prompt for pushes.
-- `/pstack-push feature-only` skips confirmation for standalone pushes like `git push --no-follow-tags origin HEAD:refs/heads/my-feature`. It blocks recognizable standalone pushes to `main`. Force pushes, deletions, and ambiguous or combined push commands still require confirmation. Never push directly to `main`.
-- `/pstack-push status` shows the current policy. The setting survives session resume and does not change merge approval.
+By default, pi-pstack prompts before recognizable shell commands that push, edit or close PRs, merge, deploy, mutate infrastructure, or recursively delete files. Without an interactive UI, it blocks commands that would prompt. Plain `git commit` and opening a PR from an already-pushed branch do not require shell approval. This is a guardrail, not a shell-security sandbox.
+
+- `/pstack-approval auto` skips pi-pstack's shell confirmation prompts, including for destructive commands.
+- `/pstack-approval confirm` restores the default.
+- `/pstack-approval status` shows the current mode.
+
+The mode is saved in the current Pi session and survives resume. New sessions default to `confirm`. Auto mode doesn't change other extensions' prompts, project-agent prompts, or explicit approvals required by your project's workflow.
+
+For a narrower exception, `/pstack-push feature-only` skips confirmation for standalone pushes like `git push --no-follow-tags origin HEAD:refs/heads/my-feature`. Force pushes, deletions, and ambiguous or combined push commands still prompt in `confirm` approval mode. The `feature-only` policy blocks recognizable standalone pushes to `main` even in `auto` mode. Never push directly to `main`. Use `/pstack-push status` to inspect the push policy and `/pstack-push confirm` to restore the default push policy.
 
 The upstream `watch-pr` and orchestration helper scripts are retained. Their runtime requirements remain project-specific. In particular, the script package uses Bun and GitHub workflows require `gh` authentication.
 

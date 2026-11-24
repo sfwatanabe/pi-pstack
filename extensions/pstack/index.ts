@@ -10,7 +10,8 @@ import { getAgentDir, isToolCallEventType, SessionManager, type ExtensionAPI } f
 import { Type } from "typebox";
 import { bundledAgentsDirectory, discoverAgents, projectAgentsDirectory, type AgentConfig, type AgentScope } from "./agents.ts";
 import { ROLE_NAMES, configPath, defaultConfig, modelsForRole, readConfig, writeConfig } from "./config.ts";
-import { isPushPolicy, pushDecision, type PushPolicy } from "./push-policy.ts";
+import { isPushPolicy, type PushPolicy } from "./push-policy.ts";
+import { isApprovalMode, shellApproval, type ApprovalMode } from "./shell-approval.ts";
 
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
@@ -231,20 +232,15 @@ async function runLimited<T>(items: T[], callback: (item: T, index: number) => P
   return results;
 }
 
-function knownExternalWrite(command: string): string | undefined {
-  const patterns: Array<[RegExp, string]> = [
-    [/\bgh\s+(?:(?:-R\s+|--repo[=\s]+)\S+\s+)?pr\s+(edit|merge|close)\b/, "GitHub pull-request mutation"],
-    [/\bgt\s+(submit|merge|create)\b/, "Graphite mutation"],
-    [/\b(terraform|tofu)\s+(apply|destroy)\b/, "infrastructure mutation"],
-    [/\bkubectl\s+(apply|delete|rollout)\b/, "Kubernetes mutation"],
-    [/\b(vercel|flyctl|railway)\s+(deploy|promote)\b/, "deployment"],
-    [/\brm\s+(-[A-Za-z]*r|--recursive)/, "recursive deletion"],
-    [/\bgit\s+push\b/, "git push"],
-  ];
-  return patterns.find(([pattern]) => pattern.test(command))?.[1];
-}
-
 const PUSH_POLICY_ENTRY = "pstack-push-policy";
+const APPROVAL_MODE_ENTRY = "pstack-approval-mode";
+
+function sessionApprovalMode(entries: ReturnType<SessionManager["getEntries"]>): ApprovalMode {
+  for (const entry of entries.slice().reverse()) {
+    if (entry.type === "custom" && entry.customType === APPROVAL_MODE_ENTRY && isApprovalMode(entry.data)) return entry.data;
+  }
+  return "confirm";
+}
 
 function sessionPushPolicy(entries: ReturnType<SessionManager["getEntries"]>): PushPolicy {
   for (const entry of entries.slice().reverse()) {
@@ -291,16 +287,34 @@ export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event, ctx) => {
     if (!isToolCallEventType("bash", event)) return;
     const { command } = event.input;
-    const operation = knownExternalWrite(command);
-    if (!operation) return;
-    if (operation === "git push") {
-      const decision = pushDecision(command, sessionPushPolicy(ctx.sessionManager.getEntries()));
-      if (decision === "allow") return;
-      if (decision === "block") return { block: true, reason: "Direct push to main blocked. Push a feature branch and open a PR." };
-    }
+    const entries = ctx.sessionManager.getEntries();
+    const decision = shellApproval(command, sessionPushPolicy(entries), sessionApprovalMode(entries));
+    if (decision.kind === "allow") return;
+    if (decision.kind === "block-main") return { block: true, reason: "Direct push to main blocked. Push a feature branch and open a PR." };
+
+    const { operation } = decision;
     if (!ctx.hasUI) return { block: true, reason: `${operation} requires explicit user confirmation; non-interactive Pi cannot request it.` };
     const approved = await ctx.ui.confirm("Confirm external or irreversible action", `Allow ${operation}?\n\n${command}`);
     if (!approved) return { block: true, reason: `User declined ${operation}.` };
+  });
+
+  pi.registerCommand("pstack-approval", {
+    description: "Set session shell approval mode: /pstack-approval confirm | auto | status",
+    handler: (args, ctx) => {
+      const option = args.trim();
+      if (option === "status" || option === "") {
+        ctx.ui.notify(`Pstack shell approval: ${sessionApprovalMode(ctx.sessionManager.getEntries())}`, "info");
+      } else if (isApprovalMode(option)) {
+        pi.appendEntry(APPROVAL_MODE_ENTRY, option);
+        if (option === "auto") {
+          ctx.ui.notify("Pstack will skip shell confirmation prompts for this session, including after resume.", "warning");
+        } else {
+          ctx.ui.notify("Pstack shell confirmation prompts restored for this session.", "info");
+        }
+      } else {
+        ctx.ui.notify("Usage: /pstack-approval confirm | auto | status", "warning");
+      }
+    },
   });
 
   pi.registerCommand("pstack-push", {
