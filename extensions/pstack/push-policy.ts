@@ -7,11 +7,14 @@ export function isPushPolicy(value: unknown): value is PushPolicy {
 export function pushDecision(command: string, policy: PushPolicy): "allow" | "confirm" | "block" {
   if (policy === "confirm") return "confirm";
 
+  const standalone = command.trim();
+  // Protect recognizable main destinations even when force or deletion syntax rules out an exemption.
+  if (/^git[ \t]+push(?:[ \t]+(?:-u|--set-upstream|--no-follow-tags|-f|--force|--force-with-lease(?:=[A-Za-z0-9._/:-]+)?|--force-if-includes|-d|--delete))*[ \t]+[A-Za-z0-9][A-Za-z0-9._-]*[ \t]+\+?(?:(?:[A-Za-z0-9][A-Za-z0-9._/-]*)?:)?(?:refs\/heads\/)?main$/.test(standalone)) return "block";
+
   // Only exempt a standalone push with a named remote and an explicit destination.
   // Shell expressions, additional refspecs, and unknown flags fall back to confirmation.
-  const match = /^git[ \t]+push[ \t]+(?:(?:-u|--set-upstream)[ \t]+)?(--no-follow-tags[ \t]+)?[A-Za-z0-9][A-Za-z0-9._-]*[ \t]+([A-Za-z0-9][A-Za-z0-9._/-]*:)?(refs\/heads\/)?([A-Za-z0-9][A-Za-z0-9._/-]*)$/.exec(command.trim());
+  const match = /^git[ \t]+push[ \t]+(?:(?:-u|--set-upstream)[ \t]+)?(--no-follow-tags[ \t]+)?[A-Za-z0-9][A-Za-z0-9._-]*[ \t]+([A-Za-z0-9][A-Za-z0-9._/-]*:)?(refs\/heads\/)?([A-Za-z0-9][A-Za-z0-9._/-]*)$/.exec(standalone);
   if (!match) return "confirm";
-  const [, noFollowTags, source, heads, destination] = match;
-  if (destination === "main") return "block";
+  const [, noFollowTags, source, heads] = match;
   return noFollowTags && source && heads ? "allow" : "confirm";
 }
