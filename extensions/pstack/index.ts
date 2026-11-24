@@ -246,7 +246,7 @@ function knownExternalWrite(command: string): string | undefined {
 
 const PUSH_POLICY_ENTRY = "pstack-push-policy";
 
-function sessionPushPolicy(entries: ReturnType<SessionManager["getBranch"]>): PushPolicy {
+function sessionPushPolicy(entries: ReturnType<SessionManager["getEntries"]>): PushPolicy {
   for (const entry of entries.slice().reverse()) {
     if (entry.type === "custom" && entry.customType === PUSH_POLICY_ENTRY && isPushPolicy(entry.data)) return entry.data;
   }
@@ -279,11 +279,11 @@ export default function (pi: ExtensionAPI) {
     return { action: "continue" } as const;
   });
 
-  pi.on("before_agent_start", (event) => {
+  pi.on("before_agent_start", (event, ctx) => {
     const instructions = [];
     if (potetoMode) instructions.push(`Pstack Poteto Mode is enabled for this session. Follow its persisted workflow: use pstack_todo for non-trivial work, select and read the matching playbook, delegate through the subagent tool when delegation helps, verify real behavior, and name only principles that changed a decision. The full skill is at ${path.join(packageRoot(), "skills/poteto-mode/SKILL.md")}.`);
-    if (sessionPushPolicy(ctx.sessionManager.getBranch()) === "feature-only") {
-      instructions.push("The user enabled feature-only pushes for this session. For an in-scope feature branch, use a standalone `git push origin HEAD:refs/heads/<branch>` without requesting separate approval. Never push directly to main. All other approvals, including merge approval, still apply.");
+    if (sessionPushPolicy(ctx.sessionManager.getEntries()) === "feature-only") {
+      instructions.push("The user enabled feature-only pushes for this session. For an in-scope feature branch, use a standalone `git push --no-follow-tags origin HEAD:refs/heads/<branch>` without requesting separate approval. Never push directly to main. All other approvals, including merge approval, still apply.");
     }
     if (instructions.length) return { systemPrompt: [event.systemPrompt, ...instructions].join("\n\n") };
   });
@@ -294,7 +294,7 @@ export default function (pi: ExtensionAPI) {
     const operation = knownExternalWrite(command);
     if (!operation) return;
     if (operation === "git push") {
-      const decision = pushDecision(command, sessionPushPolicy(ctx.sessionManager.getBranch()));
+      const decision = pushDecision(command, sessionPushPolicy(ctx.sessionManager.getEntries()));
       if (decision === "allow") return;
       if (decision === "block") return { block: true, reason: "Direct push to main blocked. Push a feature branch and open a PR." };
     }
@@ -308,7 +308,7 @@ export default function (pi: ExtensionAPI) {
     handler: async (args, ctx) => {
       const option = args.trim();
       if (option === "status" || option === "") {
-        ctx.ui.notify(`Pstack push policy: ${sessionPushPolicy(ctx.sessionManager.getBranch())}`, "info");
+        ctx.ui.notify(`Pstack push policy: ${sessionPushPolicy(ctx.sessionManager.getEntries())}`, "info");
       } else if (isPushPolicy(option)) {
         pi.appendEntry(PUSH_POLICY_ENTRY, option);
         ctx.ui.notify(`Pstack push policy set to ${option} for this session.`, "info");

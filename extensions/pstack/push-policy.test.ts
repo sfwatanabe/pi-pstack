@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { pushDecision } from "./push-policy.ts";
 
-const featurePush = "git push origin HEAD:refs/heads/pi/topic";
+const featurePush = "git push --no-follow-tags origin HEAD:refs/heads/pi/topic";
 
 test("pushes require confirmation by default", () => {
   assert.equal(pushDecision(featurePush, "confirm"), "confirm");
 });
 
 test("feature-only allows standalone pushes with an explicit feature destination", () => {
-  for (const command of [featurePush, "git push -u origin topic:refs/heads/topic", "git push origin main:refs/heads/topic"]) {
+  for (const command of [featurePush, "git push -u --no-follow-tags origin topic:refs/heads/topic", "git push --no-follow-tags origin main:refs/heads/topic"]) {
     assert.equal(pushDecision(command, "feature-only"), "allow", command);
   }
 });
@@ -24,6 +24,7 @@ test("feature-only does not exempt destructive, ambiguous, or compound commands"
   for (const command of [
     "git push",
     "git push origin topic",
+    "git push origin HEAD:refs/heads/topic",
     "git push origin HEAD:topic",
     "git push --mirror origin",
     "git push --force-with-lease origin HEAD:refs/heads/topic",

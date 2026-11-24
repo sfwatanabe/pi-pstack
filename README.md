@@ -59,7 +59,7 @@ This port deliberately removes Cursor-only setup and behavior:
 Opening a PR from an already-pushed feature branch does not require confirmation. The extension still requests confirmation for recognizable shell commands that push, edit or close PRs, merge, deploy, mutate infrastructure, or recursively delete files. In non-interactive mode it blocks those commands. This is a guardrail, not a complete shell-security sandbox. Prompts require explicit approval for other external or irreversible actions, with this session-level push exception:
 
 - `/pstack-push confirm` restores the default: prompt for pushes.
-- `/pstack-push feature-only` skips confirmation for standalone pushes like `git push origin HEAD:refs/heads/my-feature`. It blocks recognizable standalone pushes to `main`. Force pushes, deletions, and ambiguous or combined push commands still require confirmation. Never push directly to `main`.
+- `/pstack-push feature-only` skips confirmation for standalone pushes like `git push --no-follow-tags origin HEAD:refs/heads/my-feature`. It blocks recognizable standalone pushes to `main`. Force pushes, deletions, and ambiguous or combined push commands still require confirmation. Never push directly to `main`.
 - `/pstack-push status` shows the current policy. The setting survives session resume and does not change merge approval.
 
 The upstream `watch-pr` and orchestration helper scripts are retained. Their runtime requirements remain project-specific. In particular, the script package uses Bun and GitHub workflows require `gh` authentication.
