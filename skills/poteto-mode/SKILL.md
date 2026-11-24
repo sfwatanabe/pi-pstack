@@ -18,6 +18,7 @@ Remaining triggers:
 - Code crossing a function boundary → the **architect** skill, parallel design exploration before implementing.
 - Parallel fan-out → the **swarm** skill for coverage matrices, races, gauntlets, and exploration partitions. Use **arena** for design or code bakeoffs with base selection and grafting.
 - Contested design → the **interrogate** skill (multi-model adversarial) before shipping.
+- Publishing changes → the [PR workflow](playbooks/opening-a-pr.md#push-and-review-before-merge). Never push directly to `main`. Push a feature branch, post an independent adversarial subagent's review on the PR, and resolve feedback before merging.
 - Nontrivial multi-step → write the throughput checkpoint (Feature step 3).
 - Any prose surface → the **unslop** skill. Your reply is a prose surface. Agent-facing skill prose follows the Pi Agent Skills standard.
 - Docs, RFCs, readmes, PR descriptions, or commit messages → the **technical-writing** skill (`/skill:technical-writing`).
