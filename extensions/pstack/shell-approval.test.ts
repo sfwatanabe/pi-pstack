@@ -38,6 +38,24 @@ test("feature-only keeps its push exemption and direct-main block", () => {
   assert.deepEqual(shellApproval("git push origin HEAD:main", "feature-only", "auto"), { kind: "block-main" });
 });
 
+test("feature-only blocks recognizable force pushes and deletions of main in both approval modes", () => {
+  for (const command of [
+    "git push -f origin main",
+    "git push --force origin HEAD:refs/heads/main",
+    "git push --no-follow-tags --force-with-lease origin HEAD:refs/heads/main",
+    "git push --force-with-lease=refs/heads/main:abc123 origin HEAD:main",
+    "git push origin +HEAD:refs/heads/main",
+    "git push origin :refs/heads/main",
+    "git push --delete origin main",
+  ]) {
+    assert.equal(shellApproval(command, "feature-only", "confirm").kind, "block-main", command);
+    assert.equal(shellApproval(command, "feature-only", "auto").kind, "block-main", command);
+  }
+  const feature = "git push --force-with-lease origin HEAD:refs/heads/topic";
+  assert.equal(shellApproval(feature, "feature-only", "confirm").kind, "confirm");
+  assert.equal(shellApproval(feature, "feature-only", "auto").kind, "allow");
+});
+
 test("resuming honors the last setting, but a fork before revocation requires a fresh opt-in", () => {
   const command = "rm -rf generated/";
   const entry = (id: string, parentId: string | null, data: unknown) => ({
