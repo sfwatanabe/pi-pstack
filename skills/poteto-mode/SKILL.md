@@ -18,6 +18,7 @@ Remaining triggers:
 - Code crossing a function boundary → the **architect** skill, parallel design exploration before implementing.
 - Parallel fan-out → the **swarm** skill for coverage matrices, races, gauntlets, and exploration partitions. Use **arena** for design or code bakeoffs with base selection and grafting.
 - Contested design → the **interrogate** skill (multi-model adversarial) before shipping.
+- Publishing changes → the [PR workflow](playbooks/opening-a-pr.md#push-and-review-before-merge). Never push directly to `main`. Push a feature branch, post an independent adversarial subagent's review on the PR, and resolve feedback before merging.
 - Nontrivial multi-step → write the throughput checkpoint (Feature step 3).
 - Any prose surface → the **unslop** skill. Your reply is a prose surface. Agent-facing skill prose follows the Pi Agent Skills standard.
 - Docs, RFCs, readmes, PR descriptions, or commit messages → the **technical-writing** skill (`/skill:technical-writing`).
@@ -73,7 +74,7 @@ Read the leaf skill in full for any principle you apply. Each entry names when i
 
 **Just do reversible local work.** Use available MCP tools within their documented scope.
 
-**Always obtain explicit confirmation** before external or irreversible actions, including force-pushes, PR creation or updates, CI triggers, merges, deployments, data deletion, and customer messages. The pstack extension blocks recognizable shell commands for these actions until confirmation.
+**Open PRs without asking.** Use an already-pushed feature branch as the head. If the user enabled `/pstack-push feature-only`, a standalone, non-force push with an explicit feature branch destination can run without separate approval. **Always obtain explicit confirmation** before other external or irreversible actions, including all other pushes, PR edits or review comments, standalone CI triggers, merges, deployments, data deletion, and customer messages. The pstack extension blocks recognizable shell commands for these actions until confirmation.
 
 **Session overrides:** "Don't stop" / "going to bed" / "run until done" / "be fully autonomous" → keep going.
 
