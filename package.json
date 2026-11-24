@@ -1,6 +1,6 @@
 {
   "name": "pi-pstack",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Pi-native port of Cursor pstack skills, sticky Poteto Mode, and isolated subagents.",
   "license": "MIT",
   "keywords": ["pi-package", "pi", "skills", "subagent", "pstack"],

@@ -288,8 +288,9 @@ export default function (pi: ExtensionAPI) {
 
   pi.registerCommand("poteto-mode", {
     description: "Enable or disable sticky pstack Poteto Mode for this Pi session. Usage: /poteto-mode [task] | /poteto-mode off",
-    handler: async (args, ctx) => {
-      if (/^(off|disable|stop)$/i.test(args.trim())) {
+    handler: (args, ctx) => {
+      const task = args.trim();
+      if (/^(off|disable|stop)$/i.test(task)) {
         potetoMode = false;
         pi.appendEntry(MODE_ENTRY, { enabled: false });
         ctx.ui.setStatus("pstack-mode", undefined);
@@ -299,7 +300,7 @@ export default function (pi: ExtensionAPI) {
       potetoMode = true;
       pi.appendEntry(MODE_ENTRY, { enabled: true });
       ctx.ui.setStatus("pstack-mode", "pstack: poteto mode");
-      await ctx.sendUserMessage(`/skill:poteto-mode${args.trim() ? ` ${args.trim()}` : ""}`);
+      pi.sendUserMessage(task ? `/skill:poteto-mode ${task}` : "/skill:poteto-mode", { expandPromptTemplates: true });
     },
   });
 
