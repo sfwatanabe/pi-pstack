@@ -6,10 +6,11 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { Message } from "@earendil-works/pi-ai";
-import { getAgentDir, SessionManager, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { getAgentDir, isToolCallEventType, SessionManager, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { bundledAgentsDirectory, discoverAgents, projectAgentsDirectory, type AgentConfig, type AgentScope } from "./agents.ts";
 import { ROLE_NAMES, configPath, defaultConfig, modelsForRole, readConfig, writeConfig } from "./config.ts";
+import { isPushPolicy, pushDecision, type PushPolicy } from "./push-policy.ts";
 
 const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
@@ -232,15 +233,24 @@ async function runLimited<T>(items: T[], callback: (item: T, index: number) => P
 
 function knownExternalWrite(command: string): string | undefined {
   const patterns: Array<[RegExp, string]> = [
-    [/\bgit\s+push\b/, "git push"],
     [/\bgh\s+(?:(?:-R\s+|--repo[=\s]+)\S+\s+)?pr\s+(edit|merge|close)\b/, "GitHub pull-request mutation"],
     [/\bgt\s+(submit|merge|create)\b/, "Graphite mutation"],
     [/\b(terraform|tofu)\s+(apply|destroy)\b/, "infrastructure mutation"],
     [/\bkubectl\s+(apply|delete|rollout)\b/, "Kubernetes mutation"],
     [/\b(vercel|flyctl|railway)\s+(deploy|promote)\b/, "deployment"],
     [/\brm\s+(-[A-Za-z]*r|--recursive)/, "recursive deletion"],
+    [/\bgit\s+push\b/, "git push"],
   ];
   return patterns.find(([pattern]) => pattern.test(command))?.[1];
+}
+
+const PUSH_POLICY_ENTRY = "pstack-push-policy";
+
+function sessionPushPolicy(entries: ReturnType<SessionManager["getBranch"]>): PushPolicy {
+  for (const entry of entries.slice().reverse()) {
+    if (entry.type === "custom" && entry.customType === PUSH_POLICY_ENTRY && isPushPolicy(entry.data)) return entry.data;
+  }
+  return "confirm";
 }
 
 export default function (pi: ExtensionAPI) {
@@ -270,20 +280,42 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", (event) => {
-    if (!potetoMode) return;
-    return {
-      systemPrompt: `${event.systemPrompt}\n\nPstack Poteto Mode is enabled for this session. Follow its persisted workflow: use pstack_todo for non-trivial work, select and read the matching playbook, delegate through the subagent tool when delegation helps, verify real behavior, and name only principles that changed a decision. The full skill is at ${path.join(packageRoot(), "skills/poteto-mode/SKILL.md")}.`,
-    };
+    const instructions = [];
+    if (potetoMode) instructions.push(`Pstack Poteto Mode is enabled for this session. Follow its persisted workflow: use pstack_todo for non-trivial work, select and read the matching playbook, delegate through the subagent tool when delegation helps, verify real behavior, and name only principles that changed a decision. The full skill is at ${path.join(packageRoot(), "skills/poteto-mode/SKILL.md")}.`);
+    if (sessionPushPolicy(ctx.sessionManager.getBranch()) === "feature-only") {
+      instructions.push("The user enabled feature-only pushes for this session. For an in-scope feature branch, use a standalone `git push origin HEAD:refs/heads/<branch>` without requesting separate approval. Never push directly to main. All other approvals, including merge approval, still apply.");
+    }
+    if (instructions.length) return { systemPrompt: [event.systemPrompt, ...instructions].join("\n\n") };
   });
 
   pi.on("tool_call", async (event, ctx) => {
-    if (event.toolName !== "bash") return;
-    const input = event.input as { command?: string };
-    const operation = input.command ? knownExternalWrite(input.command) : undefined;
+    if (!isToolCallEventType("bash", event)) return;
+    const { command } = event.input;
+    const operation = knownExternalWrite(command);
     if (!operation) return;
+    if (operation === "git push") {
+      const decision = pushDecision(command, sessionPushPolicy(ctx.sessionManager.getBranch()));
+      if (decision === "allow") return;
+      if (decision === "block") return { block: true, reason: "Direct push to main blocked. Push a feature branch and open a PR." };
+    }
     if (!ctx.hasUI) return { block: true, reason: `${operation} requires explicit user confirmation; non-interactive Pi cannot request it.` };
-    const approved = await ctx.ui.confirm("Confirm external or irreversible action", `Allow ${operation}?\n\n${input.command}`);
+    const approved = await ctx.ui.confirm("Confirm external or irreversible action", `Allow ${operation}?\n\n${command}`);
     if (!approved) return { block: true, reason: `User declined ${operation}.` };
+  });
+
+  pi.registerCommand("pstack-push", {
+    description: "Set session push policy: /pstack-push confirm | feature-only | status",
+    handler: async (args, ctx) => {
+      const option = args.trim();
+      if (option === "status" || option === "") {
+        ctx.ui.notify(`Pstack push policy: ${sessionPushPolicy(ctx.sessionManager.getBranch())}`, "info");
+      } else if (isPushPolicy(option)) {
+        pi.appendEntry(PUSH_POLICY_ENTRY, option);
+        ctx.ui.notify(`Pstack push policy set to ${option} for this session.`, "info");
+      } else {
+        ctx.ui.notify("Usage: /pstack-push confirm | feature-only | status", "warning");
+      }
+    },
   });
 
   pi.registerCommand("poteto-mode", {

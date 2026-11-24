@@ -10,7 +10,7 @@ Invoked at the end of every other playbook.
 
 #### Push and review before merge
 
-1. Push the feature branch with approval, then open a PR without a separate approval. Pass the already-pushed branch with `gh pr create --head <branch>`. Never push directly to `main`. Standalone PRs and stack roots target `main`; stacked children target their parent branch.
+1. Push the feature branch with approval unless the session's `feature-only` push policy allows it. Then open a PR without a separate approval. Pass the already-pushed branch with `gh pr create --head <branch>`. Never push directly to `main`. Standalone PRs and stack roots target `main`; stacked children target their parent branch.
 2. After pushing, have an independent subagent that did not write the change review the PR's base-to-head diff. Give it the pushed head SHA and ask it to look for regressions, edge cases, and missing tests. Have it return actionable findings with file and line references, or state that it found none.
 3. Post the subagent's review as PR comments, including the reviewed SHA, even if there are no findings. If the subagent cannot post, the parent posts on its behalf. Fix valid findings and reply to comments with the fix or a concrete reason for disagreeing. Leave unresolved blockers open.
 4. Push fixes and repeat review and posting for the new head. Any head change requires a posted review of that head. Merge through the PR only after blocking feedback is resolved, required checks pass, and the user authorizes the merge. Follow [Shipping](shipping.md) for stacks. Follow Poteto Mode's Autonomy rules for pushes, review comments, and other GitHub writes.

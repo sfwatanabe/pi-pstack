@@ -74,7 +74,7 @@ Read the leaf skill in full for any principle you apply. Each entry names when i
 
 **Just do reversible local work.** Use available MCP tools within their documented scope.
 
-**Open PRs without asking.** Use an already-pushed feature branch as the head. **Always obtain explicit confirmation** before other external or irreversible actions, including pushes, PR edits or review comments, standalone CI triggers, merges, deployments, data deletion, and customer messages. The pstack extension blocks recognizable shell commands for these actions until confirmation.
+**Open PRs without asking.** Use an already-pushed feature branch as the head. If the user enabled `/pstack-push feature-only`, a standalone, non-force push with an explicit feature branch destination can run without separate approval. **Always obtain explicit confirmation** before other external or irreversible actions, including all other pushes, PR edits or review comments, standalone CI triggers, merges, deployments, data deletion, and customer messages. The pstack extension blocks recognizable shell commands for these actions until confirmation.
 
 **Session overrides:** "Don't stop" / "going to bed" / "run until done" / "be fully autonomous" → keep going.
 
