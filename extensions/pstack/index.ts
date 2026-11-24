@@ -233,7 +233,7 @@ async function runLimited<T>(items: T[], callback: (item: T, index: number) => P
 function knownExternalWrite(command: string): string | undefined {
   const patterns: Array<[RegExp, string]> = [
     [/\bgit\s+push\b/, "git push"],
-    [/\bgh\s+pr\s+(create|edit|merge|close)\b/, "GitHub pull-request mutation"],
+    [/\bgh\s+(?:(?:-R\s+|--repo[=\s]+)\S+\s+)?pr\s+(edit|merge|close)\b/, "GitHub pull-request mutation"],
     [/\bgt\s+(submit|merge|create)\b/, "Graphite mutation"],
     [/\b(terraform|tofu)\s+(apply|destroy)\b/, "infrastructure mutation"],
     [/\bkubectl\s+(apply|delete|rollout)\b/, "Kubernetes mutation"],
